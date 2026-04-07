@@ -1020,9 +1020,18 @@ def refresh_codex_oauth_pure(
         try:
             err = response.json()
             if isinstance(err, dict):
-                err_code = err.get("error")
-                if isinstance(err_code, str) and err_code.strip():
-                    code = err_code.strip()
+                err_obj = err.get("error")
+                # OpenAI uses nested: {"error": {"code": "...", "message": "..."}}
+                # OAuth standard uses flat: {"error": "...", "error_description": "..."}
+                if isinstance(err_obj, dict):
+                    nested_code = err_obj.get("code")
+                    if isinstance(nested_code, str) and nested_code.strip():
+                        code = nested_code.strip()
+                    nested_msg = err_obj.get("message")
+                    if isinstance(nested_msg, str) and nested_msg.strip():
+                        message = f"Codex token refresh failed: {nested_msg.strip()}"
+                elif isinstance(err_obj, str) and err_obj.strip():
+                    code = err_obj.strip()
                 err_desc = err.get("error_description") or err.get("message")
                 if isinstance(err_desc, str) and err_desc.strip():
                     message = f"Codex token refresh failed: {err_desc.strip()}"
