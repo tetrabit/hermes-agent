@@ -309,6 +309,18 @@ def resolve_alias(
         if da.model.lower() == key:
             return (da.provider, da.model, alias_name)
 
+    # Special case: "codex" alias resolves via Codex model discovery
+    # (not models.dev catalog — Codex models are only available through the
+    # dedicated Codex API / local cache / hardcoded defaults).
+    if key == "codex":
+        try:
+            from hermes_cli.codex_models import get_codex_model_ids
+            codex_models = get_codex_model_ids()
+            if codex_models:
+                return ("openai-codex", codex_models[0], key)
+        except Exception:
+            pass
+
     identity = MODEL_ALIASES.get(key)
     if identity is None:
         return None
@@ -797,9 +809,8 @@ def list_authenticated_providers(
         if overlay.auth_type in ("oauth_device_code", "oauth_external", "external_process"):
             # These use auth stores, not env vars — check for auth.json entries
             try:
-                from hermes_cli.auth import _read_auth_store
-                store = _read_auth_store()
-                if store and pid in store:
+                from hermes_cli.auth import get_provider_auth_state
+                if get_provider_auth_state(pid) is not None:
                     has_creds = True
             except Exception:
                 pass
