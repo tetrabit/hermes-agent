@@ -91,6 +91,56 @@ def test_check_for_updates_fallback_to_project_root(tmp_path, monkeypatch):
     assert mock_run.call_count >= 1
 
 
+def test_resolve_repo_dir_prefers_running_checkout(tmp_path, monkeypatch):
+    """When running from a git checkout, prefer it over ~/.hermes/hermes-agent."""
+    import hermes_cli.banner as banner
+
+    running_repo = tmp_path / "running-checkout"
+    (running_repo / ".git").mkdir(parents=True)
+    fake_banner = running_repo / "hermes_cli" / "banner.py"
+    fake_banner.parent.mkdir(parents=True, exist_ok=True)
+    fake_banner.touch()
+
+    hermes_home = tmp_path / "profile-home"
+    installed_repo = hermes_home / "hermes-agent"
+    (installed_repo / ".git").mkdir(parents=True)
+
+    monkeypatch.setattr(banner, "__file__", str(fake_banner))
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+
+    assert banner._resolve_repo_dir() == running_repo.resolve()
+
+
+def test_check_for_updates_prefers_running_checkout(tmp_path, monkeypatch):
+    """Update checks should use the running checkout even if ~/.hermes has another clone."""
+    import hermes_cli.banner as banner
+
+    running_repo = tmp_path / "running-checkout"
+    (running_repo / ".git").mkdir(parents=True)
+    fake_banner = running_repo / "hermes_cli" / "banner.py"
+    fake_banner.parent.mkdir(parents=True, exist_ok=True)
+    fake_banner.touch()
+
+    hermes_home = tmp_path / "profile-home"
+    installed_repo = hermes_home / "hermes-agent"
+    (installed_repo / ".git").mkdir(parents=True)
+
+    monkeypatch.setattr(banner, "__file__", str(fake_banner))
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(kwargs.get("cwd"))
+        return MagicMock(returncode=0, stdout="0\n")
+
+    with patch("hermes_cli.banner.subprocess.run", side_effect=fake_run):
+        assert banner.check_for_updates() == 0
+
+    assert calls
+    assert all(Path(cwd).resolve() == running_repo.resolve() for cwd in calls)
+
+
 def test_prefetch_non_blocking():
     """prefetch_update_check() should return immediately without blocking."""
     import hermes_cli.banner as banner

@@ -27,6 +27,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR_REAL="$(cd "$SCRIPT_DIR" && pwd -P)"
 cd "$SCRIPT_DIR"
 
 PYTHON_VERSION="3.11"
@@ -254,10 +255,41 @@ if [ -n "$SHELL_CONFIG" ]; then
 fi
 
 # ============================================================================
+# Register this checkout as the canonical Hermes repo
+# ============================================================================
+
+echo -e "${CYAN}→${NC} Registering this checkout..."
+
+HERMES_HOME_DIR="${HERMES_HOME:-$HOME/.hermes}"
+HERMES_REPO_DIR="$HERMES_HOME_DIR/hermes-agent"
+mkdir -p "$HERMES_HOME_DIR"
+
+CURRENT_TARGET_REAL=""
+if [ -e "$HERMES_REPO_DIR" ] || [ -L "$HERMES_REPO_DIR" ]; then
+    CURRENT_TARGET_REAL="$(cd "$HERMES_REPO_DIR" 2>/dev/null && pwd -P || true)"
+fi
+
+if [ "$CURRENT_TARGET_REAL" = "$SCRIPT_DIR_REAL" ]; then
+    echo -e "${GREEN}✓${NC} ~/.hermes/hermes-agent already points to this checkout"
+else
+    if [ -e "$HERMES_REPO_DIR" ] && [ ! -L "$HERMES_REPO_DIR" ]; then
+        BACKUP_DIR="${HERMES_HOME_DIR}/hermes-agent.backup.$(date +%Y%m%d-%H%M%S)"
+        mv "$HERMES_REPO_DIR" "$BACKUP_DIR"
+        echo -e "${YELLOW}⚠${NC} Moved existing checkout to $BACKUP_DIR"
+    fi
+
+    ln -sfn "$SCRIPT_DIR_REAL" "$HERMES_REPO_DIR"
+    echo -e "${GREEN}✓${NC} Registered ~/.hermes/hermes-agent → $SCRIPT_DIR_REAL"
+fi
+
+rm -f "$HERMES_HOME_DIR/.update_check"
+echo -e "${GREEN}✓${NC} Cleared cached update status"
+
+# ============================================================================
 # Seed bundled skills into ~/.hermes/skills/
 # ============================================================================
 
-HERMES_SKILLS_DIR="${HERMES_HOME:-$HOME/.hermes}/skills"
+HERMES_SKILLS_DIR="$HERMES_HOME_DIR/skills"
 mkdir -p "$HERMES_SKILLS_DIR"
 
 echo ""

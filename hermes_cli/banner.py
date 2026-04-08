@@ -130,21 +130,23 @@ def get_available_skills() -> Dict[str, List[str]]:
 _UPDATE_CHECK_CACHE_SECONDS = 6 * 3600
 
 
+def _current_project_repo_dir() -> Optional[Path]:
+    """Return the git checkout that contains the running Hermes code."""
+    repo_dir = Path(__file__).parent.parent.resolve()
+    return repo_dir if (repo_dir / ".git").exists() else None
+
+
 def check_for_updates() -> Optional[int]:
-    """Check how many commits behind origin/main the local repo is.
+    """Check how many commits behind origin/main the active repo is.
 
     Does a ``git fetch`` at most once every 6 hours (cached to
     ``~/.hermes/.update_check``).  Returns the number of commits behind,
     or ``None`` if the check fails or isn't applicable.
     """
     hermes_home = get_hermes_home()
-    repo_dir = hermes_home / "hermes-agent"
     cache_file = hermes_home / ".update_check"
-
-    # Must be a git repo — fall back to project root for dev installs
-    if not (repo_dir / ".git").exists():
-        repo_dir = Path(__file__).parent.parent.resolve()
-    if not (repo_dir / ".git").exists():
+    repo_dir = _resolve_repo_dir()
+    if repo_dir is None:
         return None
 
     # Read cache
@@ -192,10 +194,11 @@ def check_for_updates() -> Optional[int]:
 
 def _resolve_repo_dir() -> Optional[Path]:
     """Return the active Hermes git checkout, or None if this isn't a git install."""
-    hermes_home = get_hermes_home()
-    repo_dir = hermes_home / "hermes-agent"
-    if not (repo_dir / ".git").exists():
-        repo_dir = Path(__file__).parent.parent.resolve()
+    current_repo = _current_project_repo_dir()
+    if current_repo is not None:
+        return current_repo
+
+    repo_dir = get_hermes_home() / "hermes-agent"
     return repo_dir if (repo_dir / ".git").exists() else None
 
 
