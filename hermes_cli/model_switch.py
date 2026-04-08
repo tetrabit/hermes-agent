@@ -21,22 +21,16 @@ OpenRouter variant suffixes (``:free``, ``:extended``, ``:fast``).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, NamedTuple, Optional
 
 from hermes_cli.providers import (
-    ALIASES,
-    LABELS,
-    TRANSPORT_TO_API_MODE,
     determine_api_mode,
     get_label,
-    get_provider,
     is_aggregator,
-    normalize_provider,
     resolve_provider_full,
 )
 from hermes_cli.model_normalize import (
-    detect_vendor,
     normalize_model_for_provider,
 )
 from agent.models_dev import (
@@ -809,11 +803,11 @@ def list_authenticated_providers(
         if overlay.auth_type in ("oauth_device_code", "oauth_external", "external_process"):
             # These use auth stores, not env vars — check for auth.json entries
             try:
-                from hermes_cli.auth import get_provider_auth_state
-                if get_provider_auth_state(pid) is not None:
+                from hermes_cli.auth import get_provider_auth_state, read_credential_pool
+                if get_provider_auth_state(pid) is not None or read_credential_pool(pid):
                     has_creds = True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Auth store check failed for %s: %s", pid, exc)
         if not has_creds:
             continue
 
