@@ -903,6 +903,14 @@ def systemd_start(system: bool = False):
     system = _select_systemd_scope(system)
     if system:
         _require_root_for_system_service("start")
+
+    unit_path = get_systemd_unit_path(system=system)
+    if not unit_path.exists():
+        scope_flag = " --system" if system else ""
+        print("✗ Gateway service is not installed")
+        print(f"  Run: {'sudo ' if system else ''}hermes gateway install{scope_flag}")
+        sys.exit(1)
+
     refresh_systemd_unit_if_needed(system=system)
     subprocess.run(_systemctl_cmd(system) + ["start", get_service_name()], check=True, timeout=30)
     print(f"✓ {_service_scope_label(system).capitalize()} service started")

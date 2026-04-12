@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import hermes_cli.gateway as gateway_cli
 
 
@@ -53,6 +55,23 @@ class TestSystemdServiceRefresh:
             ["systemctl", "--user", "daemon-reload"],
             ["systemctl", "--user", "start", gateway_cli.get_service_name()],
         ]
+
+    def test_systemd_start_without_installed_unit_exits_with_guidance(self, tmp_path, monkeypatch, capsys):
+        unit_path = tmp_path / "missing.service"
+        monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
+        monkeypatch.setattr(
+            gateway_cli.subprocess,
+            "run",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("systemctl should not run when unit is missing")),
+        )
+
+        with pytest.raises(SystemExit) as excinfo:
+            gateway_cli.systemd_start()
+
+        out = capsys.readouterr().out
+        assert excinfo.value.code == 1
+        assert "Gateway service is not installed" in out
+        assert "hermes gateway install" in out
 
     def test_systemd_restart_refreshes_outdated_unit(self, tmp_path, monkeypatch):
         unit_path = tmp_path / "hermes-gateway.service"
